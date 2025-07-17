@@ -40,29 +40,45 @@ export default function ChatbotPage() {
 
   const messages = chatMessages[activeChat] || [];
 
-  // Load chats for logged-in users
+  // 🔁 Fetch chat history from backend after login
   useEffect(() => {
+    const fetchChatHistory = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/api/getChatHistory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setChatMessages(data.chats || {});
+        }
+      } catch (err) {
+        console.error("❌ Failed to fetch chats:", err);
+      }
+    };
+
     if (isLoggedIn && userId) {
-      const saved = JSON.parse(localStorage.getItem(`chats_${userId}`)) || {};
-      setChatMessages(saved);
+      fetchChatHistory();
     }
   }, [isLoggedIn, userId]);
 
-  // ⚠️ Show warning for guest users on reload
+  // ⏺ Save chat history to backend when chatMessages update
   useEffect(() => {
-    if (!isLoggedIn) {
-      if (!sessionStorage.getItem("guest_warning_shown")) {
-        alert("You're not logged in. Your chats will not be saved after reload.");
-        sessionStorage.setItem("guest_warning_shown", "true");
+    const syncChats = async () => {
+      if (!isLoggedIn || !userId) return;
+      try {
+        await fetch("http://localhost:3000/api/saveChatHistory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userId, chats: chatMessages }),
+        });
+      } catch (err) {
+        console.error("❌ Failed to save chats:", err);
       }
-    }
-  }, [isLoggedIn]);
+    };
 
-  // Save chats when updated
-  useEffect(() => {
-    if (isLoggedIn && userId) {
-      localStorage.setItem(`chats_${userId}`, JSON.stringify(chatMessages));
-    }
+    syncChats();
   }, [chatMessages, isLoggedIn, userId]);
 
   useEffect(() => {
