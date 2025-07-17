@@ -1,117 +1,82 @@
-// ✅ AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import jwt_decode from "jwt-decode";
 import axios from "axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [chatMessages, setChatMessages] = useState({});
+  const navigate = useNavigate();
 
-  // Load user on initial mount
   useEffect(() => {
-    const savedUser = localStorage.getItem("userEmail");
-    if (savedUser) {
-      setIsLoggedIn(true);
-      setUserId(savedUser);
-      fetchChatHistory(savedUser); // Load from backend
-    } else {
-      // Guest cleanup: clear old chat leftovers
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith("chats_") || key === "chatMessages")
-        .forEach((key) => localStorage.removeItem(key));
+    /* global google */
+    if (window.google) {
+      window.google.accounts.id.initialize({
+        client_id:
+          "149835755959-hkqddo6a2ohrjq2ie29mf5ac5j6i5q69.apps.googleusercontent.com",
+        callback: handleCredentialResponse,
+      });
     }
   }, []);
 
-  // 🔁 Fetch chat history from backend
-  const fetchChatHistory = async (email) => {
-    try {
-      const res = await axios.post("http://localhost:5000/chat-history", { email });
-      const chats = res.data.chats || {};
-      setChatMessages(chats);
-
-      // Save to localStorage
-      localStorage.setItem("chatMessages", JSON.stringify(chats));
-      const chatList = Object.keys(chats).map((id) => ({
-        id,
-        title: chats[id][0]?.text?.slice(0, 20) || "New chat",
-      }));
-      localStorage.setItem("chatList", JSON.stringify(chatList));
-    } catch (err) {
-      console.error("Failed to fetch chat history:", err);
-    }
-  };
-
-  // 💾 Sync chat history to backend on update
   useEffect(() => {
-    if (isLoggedIn && userId) {
-      axios
-        .put("http://localhost:5000/chat-history", {
-          email: userId,
-          chats: chatMessages,
-        })
-        .catch((err) => console.error("Failed to save chat history:", err));
-    }
-  }, [chatMessages, isLoggedIn, userId]);
+    if (user && user.email.endsWith("@iiti.ac.in")) {
+      const name = extractName(user.email);
+      const branch = extractBranch(user.email);
 
-  // 🔐 Logout function
-  const logout = () => {
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("chatMessages");
-    localStorage.removeItem("chatList");
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith("chats_") || key.startsWith("chat_"))
-      .forEach((key) => localStorage.removeItem(key));
-    setIsLoggedIn(false);
-    setUserId(null);
-    setChatMessages({});
+      axios.post("/login", {
+        name,
+        email: user.email,
+        branch,
+      });
+
+      // Send chat history to backend
+      const localChats = JSON.parse(localStorage.getItem("chats")) || [];
+      axios.post("/chat-history", { chats: localChats });
+
+      // Get latest chat history
+      axios.get("/chat-history").then((res) => {
+        localStorage.setItem("chats", JSON.stringify(res.data.chats));
+      });
+    }
+  }, [user]);
+
+  const handleCredentialResponse = (response) => {
+    const decoded = jwt_decode(response.credential);
+    if (decoded.email.endsWith("@iiti.ac.in")) {
+      setUser({
+        name: decoded.name,
+        email: decoded.email,
+      });
+      setIsLoggedIn(true);
+    } else {
+      alert("Only IIT Indore users are allowed.");
+    }
   };
 
-  // ✅ Handle Google login success
-  const handleLoginSuccess = async (response) => {
-    const userEmail = response.email;
-    const userName = response.name;
+  const logout = () => {
+    setUser(null);
+    setIsLoggedIn(false);
+    localStorage.removeItem("chats");
+    localStorage.removeItem("selectedChatId");
+  };
 
-    setIsLoggedIn(true);
-    setUserId(userEmail);
-    localStorage.setItem("userEmail", userEmail);
+  const extractName = (email) => {
+    const roll = email.split("@")[0];
+    const match = roll.match(/([a-z]{2})(\d{2})/);
+    return match ? match[1].toUpperCase() + " " + match[2] : roll;
+  };
 
-    // Send existing guest chats to backend if any
-    const localChats = localStorage.getItem("chatMessages");
-    if (localChats) {
-      try {
-        await axios.put("http://localhost:5000/chat-history", {
-          email: userEmail,
-          chats: JSON.parse(localChats),
-        });
-      } catch (error) {
-        console.error("Error syncing chats to backend:", error);
-      }
-    }
-
-    // Fetch latest history
-    fetchChatHistory(userEmail);
-
-    // Cleanup guest
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith("chats_") || key === "chatMessages")
-      .forEach((key) => localStorage.removeItem(key));
+  const extractBranch = (email) => {
+    const roll = email.split("@")[0];
+    const match = roll.match(/[a-z]{2}\d{2}(\d{3})/);
+    return match ? match[1] : "Unknown";
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        isLoggedIn,
-        userId,
-        setIsLoggedIn,
-        setUserId,
-        chatMessages,
-        setChatMessages,
-        logout,
-        handleLoginSuccess,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoggedIn, logout }}>
       {children}
     </AuthContext.Provider>
   );
