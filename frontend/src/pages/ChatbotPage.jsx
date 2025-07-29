@@ -40,7 +40,7 @@ export default function ChatbotPage() {
 
   const messages = chatMessages[activeChat] || [];
 
-  // 🔁 Fetch chat history from backend after login
+  // Fetch chat history once logged in
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
@@ -51,7 +51,15 @@ export default function ChatbotPage() {
         });
         const data = await res.json();
         if (data.success) {
-          setChatMessages(data.chats || {});
+          // Sort by latest timestamp (assuming backend provides metadata)
+          const sortedChats = Object.fromEntries(
+            Object.entries(data.chats || {}).sort((a, b) => {
+              const aTime = data.chatMetadata?.[a[0]]?.lastUpdated || 0;
+              const bTime = data.chatMetadata?.[b[0]]?.lastUpdated || 0;
+              return bTime - aTime;
+            })
+          );
+          setChatMessages(sortedChats);
         }
       } catch (err) {
         console.error("❌ Failed to fetch chats:", err);
@@ -63,7 +71,7 @@ export default function ChatbotPage() {
     }
   }, [isLoggedIn, userId]);
 
-  // ⏺ Save chat history to backend when chatMessages update
+  // Save chats when updated
   useEffect(() => {
     const syncChats = async () => {
       if (!isLoggedIn || !userId) return;
@@ -81,11 +89,27 @@ export default function ChatbotPage() {
     syncChats();
   }, [chatMessages, isLoggedIn, userId]);
 
+  // Mark session as started
   useEffect(() => {
     if (chatMessages[activeChat]?.length > 0) {
       setStarted(true);
     }
   }, [activeChat, chatMessages]);
+
+  // Clean up on window close if not logged in
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isLoggedIn) {
+        localStorage.removeItem("chatList");
+        localStorage.removeItem("chatMessages");
+        e.preventDefault();
+        e.returnValue = "Your chats will be lost unless you log in.";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isLoggedIn]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -111,6 +135,26 @@ export default function ChatbotPage() {
       [activeChat]: updatedMessages,
     }));
 
+    // Send user message to backend with chatId
+    fetch("http://localhost:3000/api/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chatId: activeChat,
+        userId,
+        message: input.trim(),
+      }),
+    }).then(async (res) => {
+      const data = await res.json();
+      const updated = updatedMessages.slice(0, -1); // Remove "processing..."
+      updated.push({ sender: "bot", text: data.reply || "No response." });
+
+      setChatMessages((prev) => ({
+        ...prev,
+        [activeChat]: updated,
+      }));
+    });
+
     setInput("");
     setStarted(true);
   };
@@ -135,48 +179,35 @@ export default function ChatbotPage() {
       }}
     >
       {!started ? (
-        <div className="flex-grow flex flex-col items-center justify-center text-center px-4 pt-20 transition-all duration-3000 ease-in-out">
+        <div className="flex-grow flex flex-col items-center justify-center text-center px-4 pt-20">
           <h2 className="mb-3 text-lg font-medium tracking-widest text-gray-300 md:text-xl">
             EXPLORE <span className="font-bold text-white">IIT INDORE</span>
           </h2>
-          <p className="max-w-2xl text-sm md:text-base text-gray-400 leading-relaxed mb-8">
-            Engage With Our AI Chatbot To Answer Any Query Related To
-            Curriculum, Management, Staff And More In IIT Indore
+          <p className="max-w-2xl text-sm md:text-base text-gray-400 mb-8">
+            Engage with our AI chatbot for queries about curriculum, staff,
+            management and more.
           </p>
-          <div className="flex w-full mt-22 max-w-2xl items-center rounded-full border border-purple-500 px-4 py-2 focus-within:ring-2 focus-within:ring-purple-500">
+          <div className="flex w-full max-w-2xl items-center rounded-full border border-purple-500 px-4 py-2">
             <input
               type="text"
               placeholder="Message Chatbot.."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="flex-grow bg-transparent px-2 text-sm text-white placeholder-gray-400 focus:outline-none md:text-base"
+              className="flex-grow bg-transparent px-2 text-sm text-white placeholder-gray-400 focus:outline-none"
             />
             <button
               onClick={handleSend}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-purple-600 transition hover:bg-purple-600 hover:text-white"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="3"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              ➤
             </button>
           </div>
         </div>
       ) : (
         <div className="flex flex-col pt-16 flex-grow max-h-screen overflow-hidden">
           <div
-            className="flex-grow overflow-y-auto px-4 py-6 flex flex-col items-center no-scrollbar"
+            className="flex-grow overflow-y-auto px-4 py-6 flex flex-col items-center"
             ref={chatContainerRef}
           >
             <div className="w-full max-w-3xl flex flex-col">
@@ -186,8 +217,8 @@ export default function ChatbotPage() {
             </div>
           </div>
 
-          <div className="border-t border-transparent py-3 px-4 bg-gradient-to-t from-[#03000d] to-transparent">
-            <div className="flex w-full max-w-3xl mx-auto items-center rounded-full border border-purple-500 px-4 py-2 focus-within:ring-2 focus-within:ring-purple-500 backdrop-blur-md">
+          <div className="border-t py-3 px-4 bg-gradient-to-t from-[#03000d] to-transparent">
+            <div className="flex w-full max-w-3xl mx-auto items-center rounded-full border border-purple-500 px-4 py-2 backdrop-blur-md">
               <textarea
                 placeholder="Message Chatbot.."
                 value={input}
@@ -199,7 +230,7 @@ export default function ChatbotPage() {
                   }
                 }}
                 rows={1}
-                className="flex-grow bg-transparent px-2 text-sm text-white placeholder-gray-400 focus:outline-none md:text-base resize-none overflow-y-auto"
+                className="flex-grow bg-transparent px-2 text-sm text-white placeholder-gray-400 focus:outline-none resize-none overflow-y-auto"
                 style={{ minHeight: "25px", maxHeight: "120px" }}
               />
               <button
@@ -211,20 +242,7 @@ export default function ChatbotPage() {
                     : "bg-white text-purple-600 cursor-not-allowed"
                 }`}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="3"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                ➤
               </button>
             </div>
           </div>
