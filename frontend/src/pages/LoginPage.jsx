@@ -1,100 +1,81 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import logo from "/src/assets/images/logo.svg";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { setIsLoggedIn, setUserId, setUserName, setChatsFromBackend } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (window.google && window.google.accounts) {
-      window.google.accounts.id.initialize({
-        client_id:
-          "149835755959-h1cms67vm400bf7aictuvgs2vm4lk16b.apps.googleusercontent.com",
-        callback: handleGoogleCallback,
-        auto_select: false,
-      });
+  const handleLogin = async (e) => {
+    e.preventDefault();
 
-      window.google.accounts.id.renderButton(
-        document.getElementById("googleSignInDiv"),
-        {
-          theme: "outline",
-          size: "large",
-          type: "standard",
-          shape: "pill",
-          text: "sign_in_with",
-        }
-      );
-    }
-  }, []);
-
-  const handleGoogleCallback = async (response) => {
-    const payload = JSON.parse(atob(response.credential.split(".")[1]));
-    const email = payload.email;
-
-    if (!email.endsWith("@iiti.ac.in")) {
-      alert("Only IIT Indore users are allowed.");
-      return;
-    }
-
-    const name = payload.name || email.split("@")[0];
-    const userId = email;
-
-    // Save to local storage and AuthContext
-    localStorage.setItem("userEmail", email);
-    setIsLoggedIn(true);
-    setUserId(userId);
-    setUserName(name);
-
-    // Sync local chats with backend
-    const localChats = JSON.parse(localStorage.getItem("chatList")) || [];
-    const localMessages = JSON.parse(localStorage.getItem("chatMessages")) || {};
     try {
-      await fetch("http://localhost:5000/chat-history", {
+      const response = await fetch("http://localhost:5000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, chats: localChats, chatMessages: localMessages }),
+        body: JSON.stringify({ email, password }),
       });
-    } catch (err) {
-      console.error("Error syncing chats:", err);
-    }
 
-    // Fetch history from backend
-    try {
-      const res = await fetch(`http://localhost:5000/chat-history?userId=${userId}`);
-      const data = await res.json();
-      setChatsFromBackend(data.chats || [], data.chatMessages || {});
-    } catch (err) {
-      console.error("Error fetching chats:", err);
-    }
+      if (!response.ok) {
+        alert("Invalid credentials");
+        return;
+      }
 
-    navigate("/chatbot");
+      const data = await response.json();
+      const userId = data.email;
+      const name = data.name || email.split("@")[0];
+
+      // ✅ Set auth context
+      setIsLoggedIn(true);
+      setUserId(userId);
+      setUserName(name);
+      localStorage.setItem("userEmail", email);
+
+      // ✅ Fetch chat history
+      const historyRes = await fetch(`http://localhost:5000/chat-history?userId=${userId}`);
+      if (!historyRes.ok) throw new Error("Failed to fetch chat history");
+
+      const historyData = await historyRes.json();
+      const { chats = [], chatMessages = {}, length = 0 } = historyData;
+
+      // ✅ Sort chats latest first using chatId timestamp if needed
+      const sortedChats = chats.sort((a, b) => (b.chatId || "").localeCompare(a.chatId || ""));
+
+      // ✅ Set chats in AuthContext
+      setChatsFromBackend(sortedChats, chatMessages);
+
+      // ✅ Navigate to chatbot page
+      navigate("/chatbot");
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed. Please try again.");
+    }
   };
-
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0e001d] via-[#1a0733] to-[#3d2171] text-white">
       <div className="flex flex-wrap justify-center items-start gap-10 px-10 py-24">
         <div className="w-full max-w-md bg-[#3a0066] p-10 rounded-xl border border-white/20 shadow-2xl">
           <h2 className="text-2xl font-bold mb-6">Login</h2>
-          <form className="flex flex-col gap-4" autoComplete="on">
+          <form className="flex flex-col gap-4" onSubmit={handleLogin}>
             <input
               type="email"
               name="email"
               placeholder="Email"
-              autoComplete="email"
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="p-3 rounded bg-white text-black placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
             <input
               type="password"
               name="password"
               placeholder="Password"
-              autoComplete="current-password"
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="p-3 rounded bg-white text-black placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
 
@@ -110,14 +91,6 @@ export default function Login() {
             >
               Login
             </button>
-
-            <div className="flex items-center gap-4 my-4">
-              <div className="flex-1 border-t border-gray-400"></div>
-              <span className="text-sm text-gray-300">OR</span>
-              <div className="flex-1 border-t border-gray-400"></div>
-            </div>
-
-            <div id="googleSignInDiv" className="flex justify-center" />
 
             <p className="text-center text-sm mt-4">
               Don&apos;t have an account?{" "}
