@@ -27,7 +27,7 @@ export default function Layout() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Sync to localStorage
+  // Sync chats to localStorage
   useEffect(() => {
     localStorage.setItem("chatList", JSON.stringify(chats));
   }, [chats]);
@@ -40,7 +40,7 @@ export default function Layout() {
     localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-  // Fetch chat history from backend
+  // Fetch chat history from backend if logged in
   useEffect(() => {
     const fetchChats = async () => {
       try {
@@ -48,11 +48,13 @@ export default function Layout() {
         const data = await res.json();
         const { chats: backendChats = [], chatMessages: messagesFromBackend = {} } = data;
 
-        setChats(backendChats.reverse());
+        // Store newest chats first
+        const sortedChats = backendChats.sort((a, b) => new Date(b.id) - new Date(a.id));
+        setChats(sortedChats);
         setChatMessages(messagesFromBackend);
 
-        if (backendChats.length > 0) {
-          setActiveChatId(backendChats[0].id);
+        if (sortedChats.length > 0) {
+          setActiveChatId(sortedChats[0].id);
         }
       } catch (err) {
         console.error("Failed to fetch chat history:", err);
@@ -62,7 +64,7 @@ export default function Layout() {
     if (isLoggedIn) fetchChats();
   }, [isLoggedIn, userEmail]);
 
-  // Warn and clear chats on window close only for guests
+  // Warn and clear chats on window close only for guests (not on reload)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!isLoggedIn && !unloadRef.current) {
@@ -70,8 +72,10 @@ export default function Layout() {
         localStorage.removeItem("chatList");
         localStorage.removeItem("chatMessages");
         localStorage.removeItem("activeChatId");
+
         e.preventDefault();
-        e.returnValue = "Are you sure you want to leave? Chats will be lost.";
+        e.returnValue = "Are you sure you want to leave? Your chats will be lost.";
+        return e;
       }
     };
 
@@ -89,7 +93,7 @@ export default function Layout() {
   };
 
   const handleNewChat = () => {
-    const id = uuidv4();
+    const id = `${Date.now()}-${uuidv4()}`;
     const newChat = { id, title: generateUniqueTitle() };
     const updatedChats = [newChat, ...chats];
     const updatedMessages = { ...chatMessages, [id]: [] };
@@ -120,7 +124,7 @@ export default function Layout() {
     if (filteredChats.length > 0) {
       setActiveChatId(filteredChats[0].id);
     } else {
-      const newId = uuidv4();
+      const newId = `${Date.now()}-${uuidv4()}`;
       const newChat = { id: newId, title: generateUniqueTitle() };
       setChats([newChat]);
       setActiveChatId(newId);
@@ -129,7 +133,7 @@ export default function Layout() {
   };
 
   const handleFirstUserMessage = (messageText) => {
-    const id = uuidv4();
+    const id = `${Date.now()}-${uuidv4()}`;
     const newChat = { id, title: generateUniqueTitle() };
     const newMessages = [{ sender: "user", text: messageText }];
     const updatedChats = [newChat, ...chats];
@@ -150,7 +154,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      {!sidebarCollapsed && (
+      {!sidebarCollapsed ? (
         <Sidebar
           chats={chats}
           activeChatId={activeChatId}
@@ -160,8 +164,7 @@ export default function Layout() {
           onDeleteChat={handleDeleteChat}
           onToggleCollapse={() => setSidebarCollapsed(true)}
         />
-      )}
-      {sidebarCollapsed && (
+      ) : (
         <div className="w-10 bg-[#1b0d3a] text-white flex items-center justify-center">
           <button
             onClick={() => setSidebarCollapsed(false)}
