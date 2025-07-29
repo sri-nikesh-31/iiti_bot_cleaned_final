@@ -1,82 +1,138 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import jwt_decode from "jwt-decode";
+import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const navigate = useNavigate();
+  const [userId, setUserId] = useState(null);
+  const [chatMessages, setChatMessages] = useState({});
+  const [chatList, setChatList] = useState([]);
 
+  // 🔁 Fetch chat history from backend
+  const fetchChatHistory = async (email) => {
+    try {
+      const res = await axios.get(`http://localhost:5000/chat-history?userId=${email}`);
+      const chats = res.data.chats || {};
+
+      const chatArray = Object.keys(chats).map((chatId) => ({
+        id: chatId,
+        title: chats[chatId][0]?.text?.slice(0, 20) || "New chat",
+      }));
+
+      setChatMessages(chats);
+      setChatList(chatArray);
+
+      localStorage.setItem("chatMessages", JSON.stringify(chats));
+      localStorage.setItem("chatList", JSON.stringify(chatArray));
+    } catch (err) {
+      console.error("❌ Failed to fetch chat history:", err);
+    }
+  };
+
+  // 💾 Sync chat history to backend per chat if logged in
   useEffect(() => {
-    /* global google */
-    if (window.google) {
-      window.google.accounts.id.initialize({
-        client_id:
-          "149835755959-hkqddo6a2ohrjq2ie29mf5ac5j6i5q69.apps.googleusercontent.com",
-        callback: handleCredentialResponse,
+    if (isLoggedIn && userId) {
+      Object.entries(chatMessages).forEach(async ([chatId, messages]) => {
+        try {
+          await axios.post("http://localhost:5000/save_chat", {
+            email: userId,
+            chatId,
+            messages,
+          });
+          console.log(`✅ Synced chat ${chatId}`);
+        } catch (err) {
+          console.error(`❌ Sync error for chat ${chatId}:`, err);
+        }
       });
+    }
+  }, [chatMessages, isLoggedIn, userId]);
+
+  // 🟡 On mount — load from localStorage if logged in
+  useEffect(() => {
+    const savedUser = localStorage.getItem("userEmail");
+    if (savedUser) {
+      setIsLoggedIn(true);
+      setUserId(savedUser);
+      fetchChatHistory(savedUser);
     }
   }, []);
 
-  useEffect(() => {
-    if (user && user.email.endsWith("@iiti.ac.in")) {
-      const name = extractName(user.email);
-      const branch = extractBranch(user.email);
-
-      axios.post("/login", {
-        name,
-        email: user.email,
-        branch,
-      });
-
-      // Send chat history to backend
-      const localChats = JSON.parse(localStorage.getItem("chats")) || [];
-      axios.post("/chat-history", { chats: localChats });
-
-      // Get latest chat history
-      axios.get("/chat-history").then((res) => {
-        localStorage.setItem("chats", JSON.stringify(res.data.chats));
-      });
-    }
-  }, [user]);
-
-  const handleCredentialResponse = (response) => {
-    const decoded = jwt_decode(response.credential);
-    if (decoded.email.endsWith("@iiti.ac.in")) {
-      setUser({
-        name: decoded.name,
-        email: decoded.email,
-      });
-      setIsLoggedIn(true);
-    } else {
-      alert("Only IIT Indore users are allowed.");
-    }
-  };
-
+  // ❌ Logout
   const logout = () => {
-    setUser(null);
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("chatMessages");
+    localStorage.removeItem("chatList");
     setIsLoggedIn(false);
-    localStorage.removeItem("chats");
-    localStorage.removeItem("selectedChatId");
+    setUserId(null);
+    setChatMessages({});
+    setChatList([]);
   };
 
-  const extractName = (email) => {
-    const roll = email.split("@")[0];
-    const match = roll.match(/([a-z]{2})(\d{2})/);
-    return match ? match[1].toUpperCase() + " " + match[2] : roll;
+  // ✅ Login using email
+  const handleLogin = async (email) => {
+    setIsLoggedIn(true);
+    setUserId(email);
+    localStorage.setItem("userEmail", email);
+
+    // 🔁 Sync guest chats to backend
+    const guestChats = localStorage.getItem("chatMessages");
+    if (guestChats) {
+      try {
+        const parsedChats = JSON.parse(guestChats);
+        for (const [chatId, messages] of Object.entries(parsedChats)) {
+          await axios.post("http://localhost:5000/save_chat", {
+            email,
+            chatId,
+            messages,
+          });
+        }
+        console.log("✅ Guest chats synced to backend");
+      } catch (error) {
+        console.error("❌ Sync guest chats failed", error);
+      }
+    }
+
+    await fetchChatHistory(email);
+
+    // Clear guest chat data from localStorage
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("chats_") || key === "chatMessages")
+      .forEach((key) => localStorage.removeItem(key));
   };
 
-  const extractBranch = (email) => {
-    const roll = email.split("@")[0];
-    const match = roll.match(/[a-z]{2}\d{2}(\d{3})/);
-    return match ? match[1] : "Unknown";
-  };
+  // 🧹 Clear localStorage on window close if not logged in
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isLoggedIn) {
+        Object.keys(localStorage)
+          .filter((key) => key.startsWith("chats_") || key === "chatMessages" || key === "chatList")
+          .forEach((key) => localStorage.removeItem(key));
+        const confirmationMessage = "You will lose your chats if you leave. Continue?";
+        e.returnValue = confirmationMessage;
+        return confirmationMessage;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isLoggedIn]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, logout }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn,
+        userId,
+        setIsLoggedIn,
+        setUserId,
+        chatMessages,
+        setChatMessages,
+        chatList,
+        setChatList,
+        handleLogin,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
