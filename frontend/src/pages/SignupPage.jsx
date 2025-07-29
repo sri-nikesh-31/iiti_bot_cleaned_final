@@ -7,31 +7,6 @@ export default function Signup() {
   const [isIITIMember, setIsIITIMember] = useState(null);
   const [memberType, setMemberType] = useState("");
 
-  useEffect(() => {
-    if (window.google && window.google.accounts) {
-      window.google.accounts.id.initialize({
-        client_id:
-          "149835755959-h1cms67vm400bf7aictuvgs2vm4lk16b.apps.googleusercontent.com", // Replace with real client ID
-        callback: handleGoogleCallback,
-      });
-      window.google.accounts.id.renderButton(
-        document.getElementById("googleSignInDiv"),
-        {
-          theme: "outline",
-          size: "large",
-          type: "standard",
-          shape: "pill",
-          text: "sign_in_with",
-        }
-      );
-    }
-  }, []);
-
-  const handleGoogleCallback = (response) => {
-    console.log("Google Credential:", response.credential);
-    // Send this to your backend
-  };
-
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   return (
@@ -196,13 +171,6 @@ export default function Signup() {
             >
               Register
             </button>
-
-            {/* OR Separator */}
-            <div className="flex items-center gap-4 my-4">
-              <div className="flex-1 border-t border-gray-400"></div>
-              <span className="text-sm text-gray-300">OR</span>
-              <div className="flex-1 border-t border-gray-400"></div>
-            </div>
 
             {/* Google Sign In */}
             <div id="googleSignInDiv" className="flex justify-center"></div>
