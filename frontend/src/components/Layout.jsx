@@ -39,7 +39,7 @@ export default function Layout() {
     localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-
+  // ✅ Fetch chat history from backend (formatted as list of lists)
   useEffect(() => {
     const fetchChats = async () => {
       try {
