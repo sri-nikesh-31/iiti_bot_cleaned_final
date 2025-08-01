@@ -35,7 +35,7 @@ export default function Signup() {
       if (response.ok && result.success) {
         setSuccess("Signup successful! Redirecting to OTP verification...");
         localStorage.setItem("pendingSignupEmail", formData.email);
-        setTimeout(() => navigate("/verify-otp"), 2000);
+        setTimeout(() => navigate("/VerifyOtp"), 2000);
       } else {
         setError(result.message || "Signup failed");
       }
