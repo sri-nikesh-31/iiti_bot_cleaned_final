@@ -1,64 +1,100 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "/src/assets/images/logo.svg";
 
 export default function Signup() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isIITIMember, setIsIITIMember] = useState(null);
   const [memberType, setMemberType] = useState("");
+  const [formData, setFormData] = useState({});
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const navigate = useNavigate();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("http://localhost:5000/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, isIITIMember, memberType }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess("Signup successful! Redirecting to OTP verification...");
+        localStorage.setItem("pendingSignupEmail", formData.email);
+        setTimeout(() => navigate("/verify-otp"), 2000);
+      } else {
+        setError(result.message || "Signup failed");
+      }
+    } catch (err) {
+      setError("Error connecting to server.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0e001d] via-[#1a0733] to-[#3d2171] text-white">
-
-      {/* Main Section */}
       <div className="flex flex-wrap justify-center items-start gap-10 px-10 py-20">
-        {/* Signup Form */}
         <div className="w-full max-w-xl bg-[#3a0066] p-10 rounded-xl border border-white/20 shadow-2xl">
           <h2 className="text-2xl font-bold mb-6">Create Your Account</h2>
-          <form autoComplete="on" className="flex flex-col gap-4">
+
+          <form autoComplete="on" className="flex flex-col gap-4" onSubmit={handleSubmit}>
             <div className="flex flex-col md:flex-row gap-4">
               <input
                 type="text"
                 name="name"
                 placeholder="Full Name"
-                autoComplete="name"
                 required
+                autoComplete="name"
+                onChange={handleChange}
                 className="flex-1 p-3 rounded bg-white text-black placeholder-gray-600"
               />
               <input
                 type="email"
                 name="email"
                 placeholder="Email"
-                autoComplete="email"
                 required
+                autoComplete="email"
+                onChange={handleChange}
                 className="flex-1 p-3 rounded bg-white text-black placeholder-gray-600"
               />
             </div>
+
             <input
               type="tel"
               name="mobile"
               placeholder="Mobile Number"
-              autoComplete="tel"
               pattern="[0-9]{10}"
               required
+              onChange={handleChange}
               className="p-3 rounded bg-white text-black placeholder-gray-600"
             />
             <input
               type="password"
               name="password"
               placeholder="Password"
-              autoComplete="new-password"
               required
+              onChange={handleChange}
               className="p-3 rounded bg-white text-black placeholder-gray-600"
             />
             <input
               type="password"
               name="confirm_password"
               placeholder="Confirm Password"
-              autoComplete="new-password"
               required
+              onChange={handleChange}
               className="p-3 rounded bg-white text-black placeholder-gray-600"
             />
 
@@ -86,15 +122,10 @@ export default function Signup() {
               </label>
             </div>
 
-            {/* IIT Member Fields */}
             {isIITIMember && (
               <div className="mt-4">
                 <div className="bg-[#4a0072] p-4 text-sm rounded border-l-4 border-pink-400 shadow">
-                  🔐{" "}
-                  <strong>
-                    We verify all IIT Indore members for authenticity.
-                  </strong>
-                  <br />
+                  🔐 <strong>We verify all IIT Indore members for authenticity.</strong><br />
                   Providing false information may result in rejection.
                 </div>
 
@@ -120,6 +151,7 @@ export default function Signup() {
                     <select
                       name="program"
                       id="program"
+                      onChange={handleChange}
                       className="p-3 rounded bg-white text-black"
                     >
                       <option value="">-- Select Program --</option>
@@ -135,6 +167,7 @@ export default function Signup() {
                       type="text"
                       name="student_dept"
                       placeholder="e.g. Mathematics, EE"
+                      onChange={handleChange}
                       className="p-3 rounded bg-white text-black"
                     />
 
@@ -142,22 +175,23 @@ export default function Signup() {
                     <input
                       type="number"
                       name="passing_year"
-                      placeholder="e.g. 2026"
                       min="2009"
                       max="2100"
+                      placeholder="e.g. 2026"
+                      onChange={handleChange}
                       className="p-3 rounded bg-white text-black"
                     />
                   </div>
                 )}
 
-                {(memberType === "professor" ||
-                  memberType === "researcher") && (
+                {(memberType === "professor" || memberType === "researcher") && (
                   <div className="mt-2">
                     <label htmlFor="dept">Department (Optional)</label>
                     <input
                       type="text"
                       name="dept"
                       placeholder="e.g. Chemistry, Mathematics"
+                      onChange={handleChange}
                       className="p-3 rounded bg-white text-black"
                     />
                   </div>
@@ -172,8 +206,8 @@ export default function Signup() {
               Register
             </button>
 
-            {/* Google Sign In */}
-            <div id="googleSignInDiv" className="flex justify-center"></div>
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {success && <p className="text-green-400 text-sm text-center">{success}</p>}
 
             <p className="text-center text-sm mt-4">
               Already have an account?{" "}
