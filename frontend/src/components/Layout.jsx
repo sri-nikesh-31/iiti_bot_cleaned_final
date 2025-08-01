@@ -27,7 +27,7 @@ export default function Layout() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Sync chats to localStorage
+  // ✅ Sync to localStorage
   useEffect(() => {
     localStorage.setItem("chatList", JSON.stringify(chats));
   }, [chats]);
@@ -40,7 +40,7 @@ export default function Layout() {
     localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-  // Fetch chat history from backend if logged in
+  // ✅ Fetch chat history from backend (assumes list of chats + chatMessages)
   useEffect(() => {
     const fetchChats = async () => {
       try {
@@ -48,13 +48,11 @@ export default function Layout() {
         const data = await res.json();
         const { chats: backendChats = [], chatMessages: messagesFromBackend = {} } = data;
 
-        // Store newest chats first
-        const sortedChats = backendChats.sort((a, b) => new Date(b.id) - new Date(a.id));
-        setChats(sortedChats);
+        setChats(backendChats);
         setChatMessages(messagesFromBackend);
 
-        if (sortedChats.length > 0) {
-          setActiveChatId(sortedChats[0].id);
+        if (backendChats.length > 0) {
+          setActiveChatId(backendChats[0].id);
         }
       } catch (err) {
         console.error("Failed to fetch chat history:", err);
@@ -64,7 +62,7 @@ export default function Layout() {
     if (isLoggedIn) fetchChats();
   }, [isLoggedIn, userEmail]);
 
-  // Warn and clear chats on window close only for guests (not on reload)
+  // ✅ Clear chats on window close if not logged in (not on reload)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!isLoggedIn && !unloadRef.current) {
@@ -132,10 +130,11 @@ export default function Layout() {
     }
   };
 
+  // ✅ When first message is sent, create a new chat with that message
   const handleFirstUserMessage = (messageText) => {
     const id = `${Date.now()}-${uuidv4()}`;
     const newChat = { id, title: generateUniqueTitle() };
-    const newMessages = [{ sender: "user", text: messageText }];
+    const newMessages = [{ role: "user", content: messageText }];
     const updatedChats = [newChat, ...chats];
 
     setChats(updatedChats);
@@ -144,7 +143,7 @@ export default function Layout() {
     return id;
   };
 
-  // Handle homepage "Get Started"
+  // ✅ From homepage (Get Started) navigation
   useEffect(() => {
     if (location.state?.createNewChat) {
       handleNewChat();
