@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useOutletContext } from "react-router-dom";
 
-const ChatMessage = ({ sender, text }) => {
-  const isProcessing = text === "Processing your query...";
-  if (sender === "bot" && isProcessing) {
+// 👇 Message Bubble Component using new format
+const ChatMessage = ({ role, content }) => {
+  const isProcessing = content === "Processing your query...";
+
+  if (role === "bot" && isProcessing) {
     return (
       <div className="self-start text-white text-sm md:text-base mb-4">
-        {text}
+        {content}
       </div>
     );
   }
@@ -15,12 +17,12 @@ const ChatMessage = ({ sender, text }) => {
   return (
     <div
       className={`${
-        sender === "user"
+        role === "user"
           ? "self-end border-purple-500 bg-[#2c1850]"
           : "self-start bg-[#1f1036] border-purple-700"
       } border rounded-2xl px-5 py-3 max-w-[90%] text-white text-sm md:text-base leading-relaxed mb-4 break-words`}
     >
-      {text}
+      {content}
     </div>
   );
 };
@@ -40,7 +42,7 @@ export default function ChatbotPage() {
 
   const messages = chatMessages[activeChat] || [];
 
-  // ✅ Updated: Fetch chat history from backend format (list of lists)
+  // 🟢 Fetch chat history from backend and convert to { role, content }
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
@@ -59,8 +61,8 @@ export default function ChatbotPage() {
             const rawMessages = data.chats[i];
 
             reconstructed[chatId] = rawMessages.map((msg) => ({
-              sender: msg.role === "assistant" ? "bot" : "user",
-              text: msg.content,
+              role: msg.role === "assistant" ? "bot" : "user",
+              content: msg.content,
             }));
           }
 
@@ -76,7 +78,7 @@ export default function ChatbotPage() {
     }
   }, [isLoggedIn, userId]);
 
-  // Save chats when updated
+  // 🔄 Sync chat messages with backend
   useEffect(() => {
     const syncChats = async () => {
       if (!isLoggedIn || !userId) return;
@@ -94,14 +96,13 @@ export default function ChatbotPage() {
     syncChats();
   }, [chatMessages, isLoggedIn, userId]);
 
-  // Mark session as started
   useEffect(() => {
     if (chatMessages[activeChat]?.length > 0) {
       setStarted(true);
     }
   }, [activeChat, chatMessages]);
 
-  // Clean up on window close if not logged in
+  // 🧹 Clear chats if user not logged in on window close
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!isLoggedIn) {
@@ -116,11 +117,12 @@ export default function ChatbotPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isLoggedIn]);
 
+  // 🟣 Send message
   const handleSend = () => {
     if (!input.trim()) return;
 
-    const userMessage = { sender: "user", text: input.trim() };
-    const botMessage = { sender: "bot", text: "Processing your query..." };
+    const userMessage = { role: "user", content: input.trim() };
+    const botMessage = { role: "bot", content: "Processing your query..." };
 
     if (!activeChat) {
       handleFirstUserMessage(input.trim());
@@ -150,8 +152,11 @@ export default function ChatbotPage() {
       }),
     }).then(async (res) => {
       const data = await res.json();
-      const updated = updatedMessages.slice(0, -1); // Remove "processing..."
-      updated.push({ sender: "bot", text: data.reply || "No response." });
+      const updated = updatedMessages.slice(0, -1); // remove "processing..."
+      updated.push({
+        role: "bot",
+        content: data.reply || "No response.",
+      });
 
       setChatMessages((prev) => ({
         ...prev,
@@ -163,6 +168,7 @@ export default function ChatbotPage() {
     setStarted(true);
   };
 
+  // Auto-scroll to bottom
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
@@ -216,7 +222,7 @@ export default function ChatbotPage() {
           >
             <div className="w-full max-w-3xl flex flex-col">
               {messages.map((msg, idx) => (
-                <ChatMessage key={idx} sender={msg.sender} text={msg.text} />
+                <ChatMessage key={idx} role={msg.role} content={msg.content} />
               ))}
             </div>
           </div>
