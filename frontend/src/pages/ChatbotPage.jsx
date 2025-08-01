@@ -46,7 +46,7 @@ export default function ChatbotPage() {
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
-        const res = await fetch("http://localhost:3000/api/getChatHistory", {
+        const res = await fetch("/api/getChatHistory", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userId }),
@@ -83,7 +83,7 @@ export default function ChatbotPage() {
     const syncChats = async () => {
       if (!isLoggedIn || !userId) return;
       try {
-        await fetch("http://localhost:3000/api/saveChatHistory", {
+        await fetch("/api/saveChatHistory", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userId, chats: chatMessages }),
@@ -142,7 +142,7 @@ export default function ChatbotPage() {
       [activeChat]: updatedMessages,
     }));
 
-    fetch("http://localhost:3000/api/sendMessage", {
+    fetch("/api/sendMessage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
