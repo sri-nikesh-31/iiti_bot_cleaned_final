@@ -24,7 +24,7 @@ export default function Signup() {
     setSuccess("");
 
     try {
-      const response = await fetch("/api/signup", {
+      const response = await fetch("/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, isIITIMember, memberType }),
