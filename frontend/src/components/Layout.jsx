@@ -27,7 +27,6 @@ export default function Layout() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // ✅ Sync to localStorage
   useEffect(() => {
     localStorage.setItem("chatList", JSON.stringify(chats));
   }, [chats]);
@@ -40,19 +39,30 @@ export default function Layout() {
     localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-  // ✅ Fetch chat history from backend (assumes list of chats + chatMessages)
+  // ✅ Fetch chat history from backend (formatted as list of lists)
   useEffect(() => {
     const fetchChats = async () => {
       try {
         const res = await fetch(`/chat-history?userId=${userEmail}`);
         const data = await res.json();
-        const { chats: backendChats = [], chatMessages: messagesFromBackend = {} } = data;
+        const { chatIds = [], chats: chatData = [] } = data;
 
-        setChats(backendChats);
-        setChatMessages(messagesFromBackend);
+        // Reconstruct chat list and messages
+        const formattedChats = chatIds.map((id, idx) => ({
+          id,
+          title: `Chat ${chatIds.length - idx}`,
+        }));
 
-        if (backendChats.length > 0) {
-          setActiveChatId(backendChats[0].id);
+        const formattedMessages = {};
+        chatIds.forEach((id, idx) => {
+          formattedMessages[id] = chatData[idx] || [];
+        });
+
+        setChats(formattedChats);
+        setChatMessages(formattedMessages);
+
+        if (chatIds.length > 0) {
+          setActiveChatId(chatIds[0]);
         }
       } catch (err) {
         console.error("Failed to fetch chat history:", err);
@@ -62,7 +72,7 @@ export default function Layout() {
     if (isLoggedIn) fetchChats();
   }, [isLoggedIn, userEmail]);
 
-  // ✅ Clear chats on window close if not logged in (not on reload)
+  // Clear chats on window close for guests
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!isLoggedIn && !unloadRef.current) {
@@ -130,11 +140,10 @@ export default function Layout() {
     }
   };
 
-  // ✅ When first message is sent, create a new chat with that message
   const handleFirstUserMessage = (messageText) => {
     const id = `${Date.now()}-${uuidv4()}`;
     const newChat = { id, title: generateUniqueTitle() };
-    const newMessages = [{ role: "user", content: messageText }];
+    const newMessages = [{ sender: "user", text: messageText }];
     const updatedChats = [newChat, ...chats];
 
     setChats(updatedChats);
@@ -143,7 +152,6 @@ export default function Layout() {
     return id;
   };
 
-  // ✅ From homepage (Get Started) navigation
   useEffect(() => {
     if (location.state?.createNewChat) {
       handleNewChat();
