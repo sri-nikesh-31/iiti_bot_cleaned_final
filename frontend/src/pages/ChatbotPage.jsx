@@ -40,7 +40,7 @@ export default function ChatbotPage() {
 
   const messages = chatMessages[activeChat] || [];
 
-  // Fetch chat history once logged in
+  // ✅ Updated: Fetch chat history from backend format (list of lists)
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
@@ -49,17 +49,22 @@ export default function ChatbotPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userId }),
         });
+
         const data = await res.json();
-        if (data.success) {
-          // Sort by latest timestamp (assuming backend provides metadata)
-          const sortedChats = Object.fromEntries(
-            Object.entries(data.chats || {}).sort((a, b) => {
-              const aTime = data.chatMetadata?.[a[0]]?.lastUpdated || 0;
-              const bTime = data.chatMetadata?.[b[0]]?.lastUpdated || 0;
-              return bTime - aTime;
-            })
-          );
-          setChatMessages(sortedChats);
+        if (data.success && Array.isArray(data.chats) && Array.isArray(data.chatIds)) {
+          const reconstructed = {};
+
+          for (let i = 0; i < data.chatIds.length; i++) {
+            const chatId = data.chatIds[i];
+            const rawMessages = data.chats[i];
+
+            reconstructed[chatId] = rawMessages.map((msg) => ({
+              sender: msg.role === "assistant" ? "bot" : "user",
+              text: msg.content,
+            }));
+          }
+
+          setChatMessages(reconstructed);
         }
       } catch (err) {
         console.error("❌ Failed to fetch chats:", err);
@@ -135,7 +140,6 @@ export default function ChatbotPage() {
       [activeChat]: updatedMessages,
     }));
 
-    // Send user message to backend with chatId
     fetch("http://localhost:3000/api/sendMessage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
