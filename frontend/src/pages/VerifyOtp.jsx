@@ -20,7 +20,7 @@ export default function VerifyOTP() {
     setSuccess("");
 
     try {
-      const response = await fetch("/api/verify-otp", {
+      const response = await fetch("/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp }),
