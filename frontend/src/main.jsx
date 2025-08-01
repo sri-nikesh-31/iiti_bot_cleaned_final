@@ -1,17 +1,21 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
+
 import App from "./App";
 import HomePage from "./pages/HomePage";
 import ChatbotPage from "./pages/ChatbotPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
-import Layout from "./components/Layout";
 import About from "./pages/About";
-import "./index.css";
-import { AuthProvider } from "./context/AuthContext"; // ✅ import it
+import VerifyOtp from "./pages/VerifyOtp"; // ✅ Import OTP Page
 
-// Define your router
+import Layout from "./components/Layout";
+import { AuthProvider } from "./context/AuthContext";
+
+import "./index.css";
+
+// Define the router
 const router = createBrowserRouter([
   {
     path: "/",
@@ -21,6 +25,7 @@ const router = createBrowserRouter([
       { path: "login", element: <LoginPage /> },
       { path: "signup", element: <SignupPage /> },
       { path: "about", element: <About /> },
+      { path: "VerifyOtp", element: <VerifyOtp /> }, // ✅ OTP Route
       {
         path: "chatbot",
         element: <Layout />,
@@ -32,7 +37,7 @@ const router = createBrowserRouter([
   },
 ]);
 
-// Render root with AuthProvider around the router
+// Render the app with AuthContext and Router
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AuthProvider>
