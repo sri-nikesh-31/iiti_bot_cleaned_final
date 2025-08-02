@@ -6,7 +6,7 @@ import { useOutletContext } from "react-router-dom";
 const ChatMessage = ({ role, content }) => {
   const isProcessing = content === "Processing your query...";
 
-  if (role === "bot" && isProcessing) {
+  if (role === "assistant" && isProcessing) {
     return (
       <div className="self-start text-white text-sm md:text-base mb-4">
         {content}
@@ -122,7 +122,7 @@ export default function ChatbotPage() {
     if (!input.trim()) return;
 
     const userMessage = { role: "user", content: input.trim() };
-    const botMessage = { role: "bot", content: "Processing your query..." };
+    const botMessage = { role: "assistant", content: "Processing your query..." };
 
     if (!activeChat) {
       handleFirstUserMessage(input.trim());
@@ -142,7 +142,7 @@ export default function ChatbotPage() {
       [activeChat]: updatedMessages,
     }));
 
-    fetch("/api/sendMessage", {
+    fetch("/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -154,7 +154,7 @@ export default function ChatbotPage() {
       const data = await res.json();
       const updated = updatedMessages.slice(0, -1); // remove "processing..."
       updated.push({
-        role: "bot",
+        role: "assistant",
         content: data.reply || "No response.",
       });
 
