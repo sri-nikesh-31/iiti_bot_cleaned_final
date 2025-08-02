@@ -28,9 +28,8 @@ export default function Signup() {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess("Signup successful! Redirecting to OTP verification...");
         localStorage.setItem("pendingSignupEmail", formData.email);
-        setTimeout(() => navigate("/VerifyOtp"), 2000);
+        navigate("/VerifyOtp");
       } else {
         setError(result.detail || "Signup failed");
       }
@@ -87,19 +86,16 @@ export default function Signup() {
             />
 
             <select
-              name="memberType"
+              name="member_type"
               required
               onChange={handleChange}
-              className="p-3 rounded bg-white text-black placeholder-gray-600"
-              defaultValue=""
+              className="p-3 rounded bg-white text-black"
             >
-              <option value="" disabled>
-                Select Member Type
-              </option>
+              <option value="">Select Member Type</option>
               <option value="Student">Student</option>
               <option value="Faculty">Faculty</option>
               <option value="Staff">Staff</option>
-              <option value="Other">Other</option>
+              <option value="Visitor">Visitor</option>
             </select>
 
             <input
@@ -142,9 +138,8 @@ export default function Signup() {
         <div className="w-full max-w-xl bg-[#400080] p-10 rounded-xl border border-white/20 shadow-2xl text-gray-200">
           <h2 className="text-xl font-bold mb-4">Welcome to IITI Bot</h2>
           <p>
-            IITI Bot is an intelligent platform crafted for IIT Indore members
-            and learners across India. Whether you're a student, researcher, or
-            staff — this AI-powered bot helps you interact with services and
+            IITI Bot is an intelligent platform crafted for IIT Indore members and learners across India.
+            Whether you're a student, researcher, or staff — this AI-powered bot helps you interact with services and
             resources more effectively.
           </p>
         </div>
