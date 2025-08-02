@@ -19,28 +19,37 @@ export default function Login() {
       });
 
       if (!response.ok) {
-        alert("Invalid credentials");
+        const errorData = await response.json();
+        alert(errorData.detail || "Invalid credentials");
         return;
       }
 
       const data = await response.json();
-      const userId = data.email;
-      const name = data.name || email.split("@")[0];
+      const token = data.access_token;
 
-      // ✅ Update auth context
+      const userId = email;
+      const name = email.split("@")[0];
+
+      // ✅ Save token & update auth context
       setIsLoggedIn(true);
       setUserId(userId);
       setUserName(name);
       localStorage.setItem("userEmail", email);
+      localStorage.setItem("token", token);
 
-      // ✅ Fetch chat history (relative path for monorepo setup)
-      const historyRes = await fetch(`/chat-history?userId=${userId}`);
+      // ✅ Fetch chat history using token
+      const historyRes = await fetch(`/chat-history?userId=${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       if (!historyRes.ok) throw new Error("Failed to fetch chat history");
 
       const historyData = await historyRes.json();
       const { chats = [], chatMessages = {}, length = 0 } = historyData;
 
-      // ✅ Sort chats by timestamp if needed
+      // ✅ Sort chats by chatId (timestamp-based)
       const sortedChats = chats.sort((a, b) =>
         (b.chatId || "").localeCompare(a.chatId || "")
       );
