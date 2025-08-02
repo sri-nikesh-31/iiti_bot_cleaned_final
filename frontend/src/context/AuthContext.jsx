@@ -1,141 +1,55 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
+// Create AuthContext
 const AuthContext = createContext();
 
+// Provider component
 export const AuthProvider = ({ children }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [chatMessages, setChatMessages] = useState({});
-  const [chatList, setChatList] = useState([]);
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [userEmail, setUserEmail] = useState(localStorage.getItem("userEmail"));
 
-  // 🔁 Fetch chat history from backend
-  const fetchChatHistory = async (email) => {
-    try {
-      const res = await axios.get(`http://localhost:5000/chat-history?userId=${email}`);
-      const chats = res.data.chats || {};
+  // Login function
+  const login = async (email, password) => {
+    const response = await fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-      const chatArray = Object.keys(chats).map((chatId) => ({
-        id: chatId,
-        title: chats[chatId][0]?.text?.slice(0, 20) || "New chat",
-      }));
-
-      setChatMessages(chats);
-      setChatList(chatArray);
-
-      localStorage.setItem("chatMessages", JSON.stringify(chats));
-      localStorage.setItem("chatList", JSON.stringify(chatArray));
-    } catch (err) {
-      console.error("❌ Failed to fetch chat history:", err);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Login failed");
     }
+
+    const data = await response.json();
+    localStorage.setItem("token", data.access_token);
+    localStorage.setItem("userEmail", email);
+    setToken(data.access_token);
+    setUserEmail(email);
   };
 
-  // 💾 Sync chat history to backend per chat if logged in
-  useEffect(() => {
-    if (isLoggedIn && userId) {
-      Object.entries(chatMessages).forEach(async ([chatId, messages]) => {
-        try {
-          await axios.post("http://localhost:5000/save_chat", {
-            email: userId,
-            chatId,
-            messages,
-          });
-          console.log(`✅ Synced chat ${chatId}`);
-        } catch (err) {
-          console.error(`❌ Sync error for chat ${chatId}:`, err);
-        }
-      });
-    }
-  }, [chatMessages, isLoggedIn, userId]);
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    setToken(null);
+    setUserEmail(null);
+  };
 
-  // 🟡 On mount — load from localStorage if logged in
+  // Automatically load from localStorage (optional, already initialized)
   useEffect(() => {
-    const savedUser = localStorage.getItem("userEmail");
-    if (savedUser) {
-      setIsLoggedIn(true);
-      setUserId(savedUser);
-      fetchChatHistory(savedUser);
-    }
+    const storedToken = localStorage.getItem("token");
+    const storedEmail = localStorage.getItem("userEmail");
+    if (storedToken) setToken(storedToken);
+    if (storedEmail) setUserEmail(storedEmail);
   }, []);
 
-  // ❌ Logout
-  const logout = () => {
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("chatMessages");
-    localStorage.removeItem("chatList");
-    setIsLoggedIn(false);
-    setUserId(null);
-    setChatMessages({});
-    setChatList([]);
-  };
-
-  // ✅ Login using email
-  const handleLogin = async (email) => {
-    setIsLoggedIn(true);
-    setUserId(email);
-    localStorage.setItem("userEmail", email);
-
-    // 🔁 Sync guest chats to backend
-    const guestChats = localStorage.getItem("chatMessages");
-    if (guestChats) {
-      try {
-        const parsedChats = JSON.parse(guestChats);
-        for (const [chatId, messages] of Object.entries(parsedChats)) {
-          await axios.post("http://localhost:5000/save_chat", {
-            email,
-            chatId,
-            messages,
-          });
-        }
-        console.log("✅ Guest chats synced to backend");
-      } catch (error) {
-        console.error("❌ Sync guest chats failed", error);
-      }
-    }
-
-    await fetchChatHistory(email);
-
-    // Clear guest chat data from localStorage
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith("chats_") || key === "chatMessages")
-      .forEach((key) => localStorage.removeItem(key));
-  };
-
-  // 🧹 Clear localStorage on window close if not logged in
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (!isLoggedIn) {
-        Object.keys(localStorage)
-          .filter((key) => key.startsWith("chats_") || key === "chatMessages" || key === "chatList")
-          .forEach((key) => localStorage.removeItem(key));
-        const confirmationMessage = "You will lose your chats if you leave. Continue?";
-        e.returnValue = confirmationMessage;
-        return confirmationMessage;
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isLoggedIn]);
-
   return (
-    <AuthContext.Provider
-      value={{
-        isLoggedIn,
-        userId,
-        setIsLoggedIn,
-        setUserId,
-        chatMessages,
-        setChatMessages,
-        chatList,
-        setChatList,
-        handleLogin,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ token, userEmail, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Hook to use auth context
 export const useAuth = () => useContext(AuthContext);
