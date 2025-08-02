@@ -26,19 +26,18 @@ export default function Login() {
 
       const data = await response.json();
       const token = data.access_token;
-
       const userId = email;
       const name = email.split("@")[0];
 
-      // ✅ Save token & update auth context
+      // ✅ Save token and set auth context
       setIsLoggedIn(true);
       setUserId(userId);
       setUserName(name);
       localStorage.setItem("userEmail", email);
       localStorage.setItem("token", token);
 
-      // ✅ Fetch chat history using token
-      const historyRes = await fetch(`/chat-history?userId=${userId}`, {
+      // ✅ Fetch chat history from /history
+      const historyRes = await fetch("/history", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -46,15 +45,25 @@ export default function Login() {
 
       if (!historyRes.ok) throw new Error("Failed to fetch chat history");
 
-      const historyData = await historyRes.json();
-      const { chats = [], chatMessages = {}, length = 0 } = historyData;
+      const historyData = await historyRes.json(); // list of lists
+      const chatMessages = {};
+      const chatList = [];
 
-      // ✅ Sort chats by chatId (timestamp-based)
-      const sortedChats = chats.sort((a, b) =>
-        (b.chatId || "").localeCompare(a.chatId || "")
-      );
+      for (const chat of historyData) {
+        if (!chat || !chat.length) continue;
 
+        const chatId = chat[0]?.chat_id || `chat-${Date.now()}`;
+        chatList.push({ chatId, name: chatId });
+
+        chatMessages[chatId] = chat.map((entry) => ({
+          role: entry.role,
+          content: entry.message,
+        }));
+      }
+
+      const sortedChats = chatList.sort((a, b) => b.chatId.localeCompare(a.chatId));
       setChatsFromBackend(sortedChats, chatMessages);
+
       navigate("/chatbot");
     } catch (err) {
       console.error("Login error:", err);
