@@ -64,7 +64,7 @@ export default function ChatbotPage() {
             const rawMessages = data.chats[i];
 
             reconstructed[chatId] = rawMessages.map((msg) => ({
-              role: msg.role === "assistant" ? "bot" : "user",
+              role: msg.role === "assistant" ? "assistant" : "user",
               content: msg.content,
             }));
           }
