@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext";
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn, userEmail } = useAuth();
+  const { isLoggedIn, authToken } = useAuth();
   const unloadRef = useRef(false);
 
   const [chats, setChats] = useState(() => {
@@ -39,18 +39,26 @@ export default function Layout() {
     localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-  // ✅ Fetch chat history from backend (formatted as list of lists)
+  // ✅ Fetch chat history from backend (GET /history with token)
   useEffect(() => {
     const fetchChats = async () => {
       try {
-        const res = await fetch(`/chat-history?userId=${userEmail}`);
+        const res = await fetch("/history", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch history");
+
         const data = await res.json();
+
         const { chatIds = [], chats: chatData = [] } = data;
 
-        // Reconstruct chat list and messages
-        const formattedChats = chatIds.map((id, idx) => ({
+        const formattedChats = chatIds.map((id, index) => ({
           id,
-          title: `Chat ${chatIds.length - idx}`,
+          title: `Chat ${chatIds.length - index}`,
         }));
 
         const formattedMessages = {};
@@ -60,19 +68,18 @@ export default function Layout() {
 
         setChats(formattedChats);
         setChatMessages(formattedMessages);
-
-        if (chatIds.length > 0) {
-          setActiveChatId(chatIds[0]);
-        }
+        if (chatIds.length > 0) setActiveChatId(chatIds[0]);
       } catch (err) {
         console.error("Failed to fetch chat history:", err);
       }
     };
 
-    if (isLoggedIn) fetchChats();
-  }, [isLoggedIn, userEmail]);
+    if (isLoggedIn && authToken) {
+      fetchChats();
+    }
+  }, [isLoggedIn, authToken]);
 
-  // Clear chats on window close for guests
+  // 🧹 Clear chat history for guests on window close
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (!isLoggedIn && !unloadRef.current) {
