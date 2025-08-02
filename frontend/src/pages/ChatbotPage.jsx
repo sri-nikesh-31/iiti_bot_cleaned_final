@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useOutletContext } from "react-router-dom";
 
-// 👇 Message Bubble Component using new format
+// 👇 Message Bubble Component
 const ChatMessage = ({ role, content }) => {
   const isProcessing = content === "Processing your query...";
 
@@ -32,7 +32,7 @@ export default function ChatbotPage() {
   const [started, setStarted] = useState(false);
   const chatContainerRef = useRef(null);
 
-  const { isLoggedIn, userId } = useAuth();
+  const { isLoggedIn, userId, token } = useAuth();
   const {
     activeChatId: activeChat,
     setChatMessages,
@@ -42,15 +42,18 @@ export default function ChatbotPage() {
 
   const messages = chatMessages[activeChat] || [];
 
-  // 🟢 Fetch chat history from backend and convert to { role, content }
+  // 🟢 Fetch chat history using token auth
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
         const res = await fetch("/history", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userId }),
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
         });
+
+        if (!res.ok) throw new Error("Failed to fetch");
 
         const data = await res.json();
         if (data.success && Array.isArray(data.chats) && Array.isArray(data.chatIds)) {
@@ -73,20 +76,23 @@ export default function ChatbotPage() {
       }
     };
 
-    if (isLoggedIn && userId) {
+    if (isLoggedIn && token) {
       fetchChatHistory();
     }
-  }, [isLoggedIn, userId]);
+  }, [isLoggedIn, token]);
 
-  // 🔄 Sync chat messages with backend
+  // 🔄 Sync chat messages with backend (POST still used to sync)
   useEffect(() => {
     const syncChats = async () => {
-      if (!isLoggedIn || !userId) return;
+      if (!isLoggedIn || !token) return;
       try {
         await fetch("/history", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userId, chats: chatMessages }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ chats: chatMessages }),
         });
       } catch (err) {
         console.error("❌ Failed to save chats:", err);
@@ -94,7 +100,7 @@ export default function ChatbotPage() {
     };
 
     syncChats();
-  }, [chatMessages, isLoggedIn, userId]);
+  }, [chatMessages, isLoggedIn, token]);
 
   useEffect(() => {
     if (chatMessages[activeChat]?.length > 0) {
@@ -152,7 +158,7 @@ export default function ChatbotPage() {
       }),
     }).then(async (res) => {
       const data = await res.json();
-      const updated = updatedMessages.slice(0, -1); // remove "processing..."
+      const updated = updatedMessages.slice(0, -1);
       updated.push({
         role: "assistant",
         content: data.reply || "No response.",
