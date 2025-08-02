@@ -76,6 +76,32 @@ export default function Signup() {
               onChange={handleChange}
               className="p-3 rounded bg-white text-black placeholder-gray-600"
             />
+
+            <input
+              type="text"
+              name="department"
+              placeholder="Department"
+              required
+              onChange={handleChange}
+              className="p-3 rounded bg-white text-black placeholder-gray-600"
+            />
+
+            <select
+              name="memberType"
+              required
+              onChange={handleChange}
+              className="p-3 rounded bg-white text-black placeholder-gray-600"
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select Member Type
+              </option>
+              <option value="Student">Student</option>
+              <option value="Faculty">Faculty</option>
+              <option value="Staff">Staff</option>
+              <option value="Other">Other</option>
+            </select>
+
             <input
               type="password"
               name="password"
