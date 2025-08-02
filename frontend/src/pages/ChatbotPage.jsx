@@ -55,20 +55,8 @@ export default function ChatbotPage() {
 
         if (!res.ok) throw new Error("Failed to fetch");
 
-        const data = await res.json();
-        if (data.success && Array.isArray(data.chats) && Array.isArray(data.chatIds)) {
-          const reconstructed = {};
-
-          for (let i = 0; i < data.chatIds.length; i++) {
-            const chatId = data.chatIds[i];
-            const rawMessages = data.chats[i];
-
-            reconstructed[chatId] = rawMessages.map((msg) => ({
-              role: msg.role === "assistant" ? "assistant" : "user",
-              content: msg.content,
-            }));
-          }
-
+        const data = await res.json();// [[{"role":"assistant","content":"<answer>"},{"role":"user","content":"<query>"}],[],[]]
+       
           setChatMessages(reconstructed);
         }
       } catch (err) {
@@ -150,11 +138,13 @@ export default function ChatbotPage() {
 
     fetch("/ask", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
       body: JSON.stringify({
-        chatId: activeChat,
-        userId,
-        message: input.trim(),
+        chat_id: activeChat,
+        query: input.trim(),
       }),
     }).then(async (res) => {
       const data = await res.json();
